@@ -1,18 +1,14 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { validateEnv } from "./lib/env";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+let port: number;
+try {
+  ({ port } = validateEnv());
+} catch (err) {
+  // eslint-disable-next-line no-console
+  console.error(err instanceof Error ? err.message : err);
+  process.exit(1);
 }
 
 app.listen(port, (err) => {

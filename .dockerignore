@@ -1,0 +1,28 @@
+# Never send secrets or local state to the Docker build context
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output (rebuilt inside the image)
+node_modules
+**/node_modules
+**/dist
+*.tsbuildinfo
+coverage
+
+# VCS, CI, and local tooling
+.git
+.github
+.cache
+.local
+.agents
+.vscode
+.idea
+
+# Docs and non-build files
+README.md
+deploy
+docker-compose.yml
+attached_assets
+replit.md
+.replit

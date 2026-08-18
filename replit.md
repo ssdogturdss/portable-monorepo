@@ -1,6 +1,6 @@
-# [Project name]
+# Portable Monorepo
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A portable, production-ready TypeScript monorepo (Express API + Postgres/Drizzle + OpenAPI codegen) that runs anywhere — see README.md for the canonical run/deploy docs.
 
 ## Run & Operate
 
@@ -22,11 +22,16 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Env var validation: `artifacts/api-server/src/lib/env.ts` (documented in `.env.example`)
+- Tests: `artifacts/api-server/src/app.test.ts` (vitest, `pnpm test`)
+- Deployment: `Dockerfile`, `docker-compose.yml`, `deploy/nginx.conf.example`, `.github/workflows/ci.yml`
+- Docs for external users: `README.md`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- All Replit-specific packages removed (connectors-sdk, vite plugins) so the repo runs anywhere; do not re-add them without user approval
+- esbuild/rollup/etc. platform-exclusion overrides removed from `pnpm-workspace.yaml` so installs work on macOS/Windows, not just Linux
+- `DATABASE_URL` and `SESSION_SECRET` are required only when `NODE_ENV=production`; `PORT` is always required
 
 ## Product
 
