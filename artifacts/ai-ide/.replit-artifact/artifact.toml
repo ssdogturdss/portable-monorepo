@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AI IDE"
+description = "A full AI-powered browser IDE with Monaco code editor, streaming Grok chat, web search, and Ubuntu 20.04 deployment helpers. Users type plain-English instructions; the AI agent writes code into the editor, searches the web, and generates deployment scripts (nginx, systemd, docker) for any GitHub repo."
+version = "1.0.0"
+id = "artifacts/ai-ide"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23107
+
+[services.development]
+run = "pnpm --filter @workspace/ai-ide run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ai-ide", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ai-ide/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23107"
+BASE_PATH = "/"

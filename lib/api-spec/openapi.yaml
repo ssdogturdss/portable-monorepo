@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: sessions
+    description: AI chat session management
+  - name: ai
+    description: AI inference and streaming
+  - name: templates
+    description: Deployment templates for Ubuntu / nginx / systemd
 paths:
   /healthz:
     get:
@@ -24,6 +30,194 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /ai/sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all chat sessions
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new chat session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Created session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /ai/sessions/recent:
+    get:
+      operationId: getRecentSessions
+      tags: [sessions]
+      summary: Recent sessions with last message preview
+      responses:
+        "200":
+          description: Recent sessions with previews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionPreview"
+
+  /ai/sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get a session with its messages
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Session with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionWithMessages"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete a session and all its messages
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        "204":
+          description: Deleted
+
+  /ai/sessions/{sessionId}/messages:
+    get:
+      operationId: getSessionMessages
+      tags: [sessions]
+      summary: Get messages for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  /ai/chat:
+    post:
+      operationId: sendChat
+      tags: [ai]
+      summary: Send a chat message and get a streaming AI response
+      description: Returns a non-streaming summary; actual streaming uses /api/ai/stream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: AI reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /ai/models:
+    get:
+      operationId: listModels
+      tags: [ai]
+      summary: List available Grok models
+      responses:
+        "200":
+          description: Available models
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Model"
+
+  /templates:
+    get:
+      operationId: listTemplates
+      tags: [templates]
+      summary: List deployment templates
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+
+  /templates/{templateId}:
+    get:
+      operationId: getTemplate
+      tags: [templates]
+      summary: Get a single deployment template with its file content
+      parameters:
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Template with content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -33,3 +227,145 @@ components:
           type: string
       required:
         - status
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: number
+        title:
+          type: string
+        model:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, model, createdAt, updatedAt]
+
+    SessionInput:
+      type: object
+      properties:
+        title:
+          type: string
+        model:
+          type: string
+      required: [title]
+
+    SessionPreview:
+      type: object
+      properties:
+        id:
+          type: number
+        title:
+          type: string
+        model:
+          type: string
+        lastMessage:
+          type: ["string", "null"]
+        messageCount:
+          type: number
+        updatedAt:
+          type: string
+      required: [id, title, model, messageCount, updatedAt]
+
+    SessionWithMessages:
+      type: object
+      properties:
+        id:
+          type: number
+        title:
+          type: string
+        model:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, title, model, messages, createdAt, updatedAt]
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: number
+        sessionId:
+          type: number
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        toolResults:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required: [id, sessionId, role, content, createdAt]
+
+    ChatInput:
+      type: object
+      properties:
+        sessionId:
+          type: number
+        message:
+          type: string
+        model:
+          type: string
+        webSearch:
+          type: boolean
+      required: [sessionId, message]
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        contextLength:
+          type: number
+      required: [id, name, contextLength]
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [nginx, systemd, docker, deploy]
+        language:
+          type: string
+      required: [id, name, description, category, language]
+
+    TemplateDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        language:
+          type: string
+        content:
+          type: string
+      required: [id, name, description, category, language, content]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
