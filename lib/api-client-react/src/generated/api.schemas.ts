@@ -104,3 +104,31 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface Note {
+  id: number;
+  title: string;
+  body?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateNote {
+  /** @minLength 1 */
+  title: string;
+  body?: string | null;
+}
+
+export interface UpdateNote {
+  /** @minLength 1 */
+  title?: string;
+  body?: string | null;
+}
+
+export interface ValidationError {
+  error: string;
+}
+
+export interface NotFoundError {
+  error: string;
+}
+

@@ -16,6 +16,8 @@ tags:
     description: AI inference and streaming
   - name: templates
     description: Deployment templates for Ubuntu / nginx / systemd
+  - name: notes
+    description: Notes operations
 paths:
   /healthz:
     get:
@@ -218,6 +220,128 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /notes:
+    get:
+      operationId: listNotes
+      tags: [notes]
+      summary: List notes
+      description: Returns all notes
+      responses:
+        "200":
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Note"
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Create a note
+      description: Creates a new note and returns it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNote"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /notes/{id}:
+    get:
+      operationId: getNote
+      tags: [notes]
+      summary: Get a note
+      description: Returns a single note by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: The note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+    patch:
+      operationId: updateNote
+      tags: [notes]
+      summary: Update a note
+      description: Partially updates a note and returns the updated version
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNote"
+      responses:
+        "200":
+          description: Updated note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete a note
+      description: Deletes a note by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotFoundError"
+
 components:
   schemas:
     HealthStatus:
@@ -369,3 +493,63 @@ components:
         error:
           type: string
       required: [error]
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: number
+        title:
+          type: string
+        body:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - createdAt
+        - updatedAt
+
+    CreateNote:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        body:
+          type: string
+          nullable: true
+      required:
+        - title
+
+    UpdateNote:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        body:
+          type: string
+          nullable: true
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    NotFoundError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

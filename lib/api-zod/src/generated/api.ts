@@ -175,3 +175,91 @@ export const GetTemplateResponse = zod.object({
 })
 
 
+/**
+ * Returns all notes
+ * @summary List notes
+ */
+export const ListNotesResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "body": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListNotesResponse = zod.array(ListNotesResponseItem)
+
+
+/**
+ * Creates a new note and returns it
+ * @summary Create a note
+ */
+
+
+
+export const CreateNoteBody = zod.object({
+  "title": zod.string().min(1),
+  "body": zod.string().nullish()
+})
+
+export const CreateNoteResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "body": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Returns a single note by ID
+ * @summary Get a note
+ */
+export const GetNoteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetNoteResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "body": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Partially updates a note and returns the updated version
+ * @summary Update a note
+ */
+export const UpdateNoteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateNoteBody = zod.object({
+  "title": zod.string().min(1).optional(),
+  "body": zod.string().nullish()
+})
+
+export const UpdateNoteResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "body": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Deletes a note by ID
+ * @summary Delete a note
+ */
+export const DeleteNoteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteNoteResponse = zod.void()
+
+

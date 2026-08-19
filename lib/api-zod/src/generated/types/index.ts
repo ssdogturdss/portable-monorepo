@@ -7,11 +7,14 @@
  */
 
 export * from './chatInput';
+export * from './createNote';
 export * from './errorResponse';
 export * from './healthStatus';
 export * from './message';
 export * from './messageRole';
 export * from './model';
+export * from './note';
+export * from './notFoundError';
 export * from './session';
 export * from './sessionInput';
 export * from './sessionPreview';
@@ -19,3 +22,5 @@ export * from './sessionWithMessages';
 export * from './template';
 export * from './templateCategory';
 export * from './templateDetail';
+export * from './updateNote';
+export * from './validationError';

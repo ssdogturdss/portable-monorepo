@@ -5,6 +5,7 @@ import aiChatRouter from "./ai-chat";
 import aiModelsRouter from "./ai-models";
 import templatesRouter from "./templates";
 import githubRouter from "./github";
+import notesRouter from "./notes";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(aiChatRouter);
 router.use(aiModelsRouter);
 router.use(templatesRouter);
 router.use(githubRouter);
+router.use(notesRouter);
 
 export default router;
