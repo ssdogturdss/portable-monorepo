@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import { db, sessionsTable, messagesTable } from "@workspace/db";
 import { SendChatBody } from "@workspace/api-zod";
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import { xaiProxy } from "../lib/connectors";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -19,6 +19,12 @@ async function buildHistory(
     .limit(40);
   return msgs.map((m) => ({ role: m.role, content: m.content }));
 }
+
+const SYSTEM_PROMPT =
+  "You are an expert software engineer and DevOps assistant. Help the user write code, " +
+  "configuration files, deployment scripts, and system administration commands. " +
+  "When generating file content, wrap it in a markdown code block with the appropriate " +
+  "language tag. Be concise and precise.";
 
 // POST /ai/chat — non-streaming, saves messages to DB
 router.post("/ai/chat", async (req: Request, res: Response) => {
@@ -50,23 +56,15 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
   const history = await buildHistory(sessionId);
 
   try {
-    const connectors = new ReplitConnectors();
     const tools = webSearch ? [{ type: "web_search" }] : undefined;
     const body: Record<string, unknown> = {
       model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert software engineer and DevOps assistant. Help the user write code, configuration files, deployment scripts, and system administration commands. When generating file content, wrap it in a markdown code block with the appropriate language tag. Be concise and precise.",
-        },
-        ...history,
-      ],
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
       max_tokens: 4096,
     };
     if (tools) body.tools = tools;
 
-    const response = await connectors.proxy("xai", "/v1/chat/completions", {
+    const response = await xaiProxy("/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -144,24 +142,16 @@ router.post("/ai/stream", async (req: Request, res: Response) => {
   };
 
   try {
-    const connectors = new ReplitConnectors();
     const tools = webSearch ? [{ type: "web_search" }] : undefined;
     const body: Record<string, unknown> = {
       model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert software engineer and DevOps assistant. Help the user write code, configuration files, deployment scripts, and system administration commands. When generating file content, wrap it in a markdown code block with the appropriate language tag. Be concise and precise.",
-        },
-        ...history,
-      ],
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
       stream: true,
       max_tokens: 4096,
     };
     if (tools) body.tools = tools;
 
-    const response = await connectors.proxy("xai", "/v1/chat/completions", {
+    const response = await xaiProxy("/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

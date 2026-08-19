@@ -68,6 +68,24 @@ const SPECS: EnvVarSpec[] = [
       return null;
     },
   },
+  {
+    name: "XAI_API_KEY",
+    description:
+      "xAI API key for Grok AI features. Required outside Replit. Obtain at https://console.x.ai. Inside Replit the connector handles authentication automatically.",
+    required: false,
+  },
+  {
+    name: "GITHUB_TOKEN",
+    description:
+      "GitHub personal access token with repo/contents write permission. Required outside Replit for the GitHub push feature. Create at https://github.com/settings/tokens. Inside Replit the connector handles authentication automatically.",
+    required: false,
+  },
+  {
+    name: "CORS_ORIGIN",
+    description:
+      "Comma-separated list of allowed CORS origins (e.g. https://app.example.com). When omitted in development all origins are allowed; in production all cross-origin requests are blocked unless this is set.",
+    required: false,
+  },
 ];
 
 export interface ValidatedEnv {

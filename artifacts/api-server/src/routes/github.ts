@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import { githubProxy } from "../lib/connectors";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -7,8 +7,7 @@ const router = Router();
 // GET /github/user — authenticated GitHub user
 router.get("/github/user", async (_req, res) => {
   try {
-    const connectors = new ReplitConnectors();
-    const response = await connectors.proxy("github", "/user");
+    const response = await githubProxy("/user");
     if (!response.ok) {
       res.status(response.status).json({ error: "GitHub request failed" });
       return;
@@ -21,16 +20,14 @@ router.get("/github/user", async (_req, res) => {
     res.json({ login: data.login, name: data.name, avatarUrl: data.avatar_url });
   } catch (err) {
     logger.error({ err }, "GitHub user error");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: String(err instanceof Error ? err.message : err) });
   }
 });
 
 // GET /github/repos — list repos the token can access
 router.get("/github/repos", async (_req, res) => {
   try {
-    const connectors = new ReplitConnectors();
-    const response = await connectors.proxy(
-      "github",
+    const response = await githubProxy(
       "/user/repos?sort=pushed&per_page=50&affiliation=owner,collaborator",
     );
     if (!response.ok) {
@@ -55,7 +52,7 @@ router.get("/github/repos", async (_req, res) => {
     );
   } catch (err) {
     logger.error({ err }, "GitHub repos error");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: String(err instanceof Error ? err.message : err) });
   }
 });
 
@@ -63,9 +60,7 @@ router.get("/github/repos", async (_req, res) => {
 router.get("/github/repos/:owner/:repo/branches", async (req, res) => {
   const { owner, repo } = req.params;
   try {
-    const connectors = new ReplitConnectors();
-    const response = await connectors.proxy(
-      "github",
+    const response = await githubProxy(
       `/repos/${owner}/${repo}/branches?per_page=50`,
     );
     if (!response.ok) {
@@ -76,11 +71,11 @@ router.get("/github/repos/:owner/:repo/branches", async (req, res) => {
     res.json(branches.map((b) => b.name));
   } catch (err) {
     logger.error({ err }, "GitHub branches error");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: String(err instanceof Error ? err.message : err) });
   }
 });
 
-// POST /github/push — create or update a file
+// POST /github/push — create or update a file in a repo
 router.post("/github/push", async (req, res) => {
   const { owner, repo, branch, path, message, content } = req.body as {
     owner: string;
@@ -92,19 +87,16 @@ router.post("/github/push", async (req, res) => {
   };
 
   if (!owner || !repo || !branch || !path || !message || content === undefined) {
-    res.status(400).json({ error: "Missing required fields" });
+    res.status(400).json({ error: "Missing required fields: owner, repo, branch, path, message, content" });
     return;
   }
 
   const safePath = path.replace(/^\/+/, "");
 
   try {
-    const connectors = new ReplitConnectors();
-
-    // Check if file already exists to get its SHA
+    // Check if file already exists to get its SHA (needed for updates)
     let existingSha: string | undefined;
-    const existingRes = await connectors.proxy(
-      "github",
+    const existingRes = await githubProxy(
       `/repos/${owner}/${repo}/contents/${safePath}?ref=${branch}`,
     );
     if (existingRes.ok) {
@@ -114,15 +106,10 @@ router.post("/github/push", async (req, res) => {
 
     // Create or update the file
     const b64 = Buffer.from(content, "utf-8").toString("base64");
-    const body: Record<string, unknown> = {
-      message,
-      content: b64,
-      branch,
-    };
+    const body: Record<string, unknown> = { message, content: b64, branch };
     if (existingSha) body.sha = existingSha;
 
-    const pushRes = await connectors.proxy(
-      "github",
+    const pushRes = await githubProxy(
       `/repos/${owner}/${repo}/contents/${safePath}`,
       {
         method: "PUT",
@@ -151,7 +138,7 @@ router.post("/github/push", async (req, res) => {
     });
   } catch (err) {
     logger.error({ err }, "GitHub push error");
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: String(err instanceof Error ? err.message : err) });
   }
 });
 

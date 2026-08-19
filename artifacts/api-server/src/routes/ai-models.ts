@@ -1,18 +1,19 @@
 import { Router } from "express";
-import { ReplitConnectors } from "@replit/connectors-sdk";
+import { xaiProxy } from "../lib/connectors";
 
 const router = Router();
 
+const FALLBACK_MODELS = [
+  { id: "grok-3", name: "Grok 3", contextLength: 131072 },
+  { id: "grok-3-mini", name: "Grok 3 Mini", contextLength: 131072 },
+  { id: "grok-2", name: "Grok 2", contextLength: 131072 },
+];
+
 router.get("/ai/models", async (_req, res) => {
   try {
-    const connectors = new ReplitConnectors();
-    const response = await connectors.proxy("xai", "/v1/language-models");
+    const response = await xaiProxy("/v1/language-models");
     if (!response.ok) {
-      res.json([
-        { id: "grok-3", name: "Grok 3", contextLength: 131072 },
-        { id: "grok-3-mini", name: "Grok 3 Mini", contextLength: 131072 },
-        { id: "grok-2", name: "Grok 2", contextLength: 131072 },
-      ]);
+      res.json(FALLBACK_MODELS);
       return;
     }
     const data = (await response.json()) as {
@@ -20,7 +21,6 @@ router.get("/ai/models", async (_req, res) => {
         id: string;
         name?: string;
         context_length?: number;
-        description?: string;
       }>;
     };
     const models = (data.models ?? []).map((m) => ({
@@ -28,12 +28,9 @@ router.get("/ai/models", async (_req, res) => {
       name: m.name ?? m.id,
       contextLength: m.context_length ?? 131072,
     }));
-    res.json(models);
+    res.json(models.length ? models : FALLBACK_MODELS);
   } catch {
-    res.json([
-      { id: "grok-3", name: "Grok 3", contextLength: 131072 },
-      { id: "grok-3-mini", name: "Grok 3 Mini", contextLength: 131072 },
-    ]);
+    res.json(FALLBACK_MODELS);
   }
 });
 

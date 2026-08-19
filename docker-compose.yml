@@ -7,9 +7,8 @@ services:
       # No default on purpose: compose fails fast if POSTGRES_PASSWORD is unset.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: ${POSTGRES_DB:-app}
-    # Postgres is reachable by the api service over the internal network.
     # Exposed on localhost-only for local tooling (drizzle-kit push, psql, etc.)
-    # Do NOT expose this on an internet-facing server.
+    # Do NOT expose this port on an internet-facing server.
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -24,7 +23,7 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
+  app:
     build: .
     restart: unless-stopped
     env_file:
@@ -32,7 +31,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3000}
+      SERVE_FRONTEND: "true"
       DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@postgres:5432/${POSTGRES_DB:-app}
+      # XAI_API_KEY and GITHUB_TOKEN are read from .env via env_file above
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
