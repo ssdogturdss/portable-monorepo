@@ -34,3 +34,53 @@ jobs:
         run: pnpm run build
         env:
           NODE_ENV: production
+
+  schema-check:
+    name: Schema / migration drift
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: app
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 1. Apply every committed migration to the fresh database.
+      #    Fails if any migration file contains invalid SQL.
+      - name: Apply committed migrations
+        run: pnpm --filter @workspace/db run migrate
+        env:
+          DATABASE_URL: postgres://app:ci_password@localhost:5432/app
+
+      # 2. Re-run generate. If the schema has changed without a matching
+      #    migration file the generator writes a new file.
+      #    `git add --intent-to-add` marks any new untracked files so that
+      #    `git diff --exit-code` catches them too — not just modified ones.
+      - name: Detect schema drift (schema ≠ committed migrations)
+        run: |
+          pnpm --filter @workspace/db run generate
+          git add --intent-to-add lib/db/drizzle/
+          git diff --exit-code lib/db/drizzle/

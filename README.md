@@ -118,11 +118,14 @@ The compose file provisions Postgres with a persistent volume and wires `DATABAS
 The data layer lives in `lib/db` (Drizzle ORM, PostgreSQL). The schema is currently empty — add tables in `lib/db/src/schema/`.
 
 ```bash
-# Apply schema to the database pointed at by DATABASE_URL
-DATABASE_URL=postgres://app:app@localhost:5432/app pnpm --filter @workspace/db run push
+# Apply all pending migrations to the database pointed at by DATABASE_URL
+DATABASE_URL=postgres://app:app@localhost:5432/app pnpm --filter @workspace/db run migrate
+
+# After editing the schema, generate a new migration file
+pnpm --filter @workspace/db run generate
 ```
 
-For local development, `docker compose up postgres` (with the host `ports` mapping uncommented in `docker-compose.yml`) gives you a ready database at `postgres://app:<your-password>@localhost:5432/app`.
+For local development, `docker compose up postgres` gives you a ready database at `postgres://app:<your-password>@localhost:5432/app` (Postgres is exposed on `127.0.0.1:5432`).
 
 ## API contract & codegen
 
