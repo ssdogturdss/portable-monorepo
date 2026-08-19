@@ -49,6 +49,9 @@ catalog:
   vite: ^7.3.2
   wouter: ^3.3.5
   zod: ^3.25.76
+  "@replit/vite-plugin-cartographer": "*"
+  "@replit/vite-plugin-dev-banner": "*"
+  "@replit/vite-plugin-runtime-error-modal": "*"
 
 autoInstallPeers: false
 

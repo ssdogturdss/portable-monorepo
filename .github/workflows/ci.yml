@@ -34,3 +34,132 @@ jobs:
         run: pnpm run build
         env:
           NODE_ENV: production
+
+  schema-check:
+    name: Schema / migration drift
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: app
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 1. Apply every committed migration to the fresh database.
+      #    Fails if any migration file contains invalid SQL.
+      - name: Apply committed migrations
+        run: pnpm --filter @workspace/db run migrate
+        env:
+          DATABASE_URL: postgres://app:ci_password@localhost:5432/app
+
+      # 2. Re-run generate. If the schema has changed without a matching
+      #    migration file the generator writes a new file.
+      #    `git add --intent-to-add` marks any new untracked files so that
+      #    `git diff --exit-code` catches them too — not just modified ones.
+      - name: Detect schema drift (schema ≠ committed migrations)
+        run: |
+          pnpm --filter @workspace/db run generate
+          git add --intent-to-add lib/db/drizzle/
+          git diff --exit-code lib/db/drizzle/
+
+      # 3. Fail loudly if any committed migration contains a destructive
+      #    statement (DROP TABLE or DROP COLUMN). This is the primary guard
+      #    against accidental data loss when schema columns are removed.
+      #    Developers who intentionally need a destructive migration must
+      #    explicitly acknowledge the risk (see README § Safe migration path).
+      - name: Block destructive migrations (DROP TABLE / DROP COLUMN)
+        run: |
+          DESTRUCTIVE=$(grep -rliE '^\s*(DROP\s+TABLE|ALTER\s+TABLE\s+\S+\s+DROP\s+COLUMN)' lib/db/drizzle/*.sql 2>/dev/null || true)
+          if [ -n "$DESTRUCTIVE" ]; then
+            echo ""
+            echo "##############################################################"
+            echo "  DESTRUCTIVE MIGRATION DETECTED — CI BLOCKED"
+            echo "##############################################################"
+            echo ""
+            echo "The following migration file(s) contain DROP TABLE or DROP COLUMN:"
+            echo "$DESTRUCTIVE"
+            echo ""
+            echo "Dropping columns or tables from a live database can cause"
+            echo "irreversible data loss. Before merging:"
+            echo "  1. Confirm that every affected column/table has already been"
+            echo "     deprecated and emptied (or backed up) in production."
+            echo "  2. If the change is intentional, add a comment to the SQL"
+            echo "     file explaining why it is safe, then set the environment"
+            echo "     variable ALLOW_DESTRUCTIVE_MIGRATIONS=1 in the CI job to"
+            echo "     bypass this check."
+            echo ""
+            echo "See README § 'Safe migration path' for the full process."
+            echo ""
+            if [ "${ALLOW_DESTRUCTIVE_MIGRATIONS:-0}" != "1" ]; then
+              exit 1
+            else
+              echo "ALLOW_DESTRUCTIVE_MIGRATIONS=1 — check bypassed (proceed with caution)."
+            fi
+          else
+            echo "No destructive statements found in committed migrations. ✓"
+          fi
+
+      # 4. Build the API server, start it against the CI database, and
+      #    smoke-test the health endpoint. This catches schema changes that
+      #    pass the migration check but crash the server at runtime (e.g. a
+      #    column rename that is still referenced by a query).
+      - name: Build API server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Smoke-test API server against migrated database
+        run: |
+          PORT=3000 \
+          DATABASE_URL=postgres://app:ci_password@localhost:5432/app \
+          SESSION_SECRET=ci-smoke-test-secret-not-used-in-production-000 \
+          pnpm --filter @workspace/api-server run start &
+          API_PID=$!
+
+          # Wait up to 30 s for the server to accept connections.
+          echo "Waiting for API server to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/healthz > /dev/null 2>&1; then
+              echo "Server is up."
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "API server did not start within 30 seconds."
+              kill "$API_PID" 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Run the health check and capture the HTTP status code.
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/healthz)
+          echo "Health endpoint returned HTTP $HTTP_STATUS"
+
+          kill "$API_PID" 2>/dev/null || true
+
+          if [ "$HTTP_STATUS" -ge 500 ] || [ "$HTTP_STATUS" -eq 0 ]; then
+            echo "Smoke test FAILED: health endpoint returned $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Smoke test PASSED."
