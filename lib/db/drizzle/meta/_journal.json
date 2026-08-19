@@ -8,13 +8,6 @@
       "when": 1787102215733,
       "tag": "0000_premium_justin_hammer",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1787106171054,
-      "tag": "0001_add_auth_and_user_id",
-      "breakpoints": true
     }
   ]
 }

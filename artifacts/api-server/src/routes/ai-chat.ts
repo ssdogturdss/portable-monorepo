@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, sessionsTable, messagesTable } from "@workspace/db";
 import { SendChatBody } from "@workspace/api-zod";
 import { xaiProxy } from "../lib/connectors";
@@ -28,12 +28,6 @@ const SYSTEM_PROMPT =
 
 // POST /ai/chat — non-streaming, saves messages to DB
 router.post("/ai/chat", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const userId = req.user.id;
-
   const parsed = SendChatBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request body" });
@@ -47,10 +41,7 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
   } = parsed.data;
 
   const session = await db.query.sessionsTable.findFirst({
-    where: and(
-      eq(sessionsTable.id, sessionId),
-      eq(sessionsTable.userId, userId),
-    ),
+    where: eq(sessionsTable.id, sessionId),
   });
   if (!session) {
     res.status(404).json({ error: "Session not found" });
@@ -112,12 +103,6 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
 
 // POST /ai/stream — Server-Sent Events streaming response
 router.post("/ai/stream", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  const userId = req.user.id;
-
   const parsed = SendChatBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request body" });
@@ -131,10 +116,7 @@ router.post("/ai/stream", async (req: Request, res: Response) => {
   } = parsed.data;
 
   const session = await db.query.sessionsTable.findFirst({
-    where: and(
-      eq(sessionsTable.id, sessionId),
-      eq(sessionsTable.userId, userId),
-    ),
+    where: eq(sessionsTable.id, sessionId),
   });
   if (!session) {
     res.status(404).json({ error: "Session not found" });

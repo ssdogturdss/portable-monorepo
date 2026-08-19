@@ -6,10 +6,8 @@ import express, {
   type NextFunction,
 } from "express";
 import cors from "cors";
-import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import { ZodError } from "zod";
-import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -46,10 +44,8 @@ const corsOrigin: string | string[] | boolean = rawCorsOrigin
   : !isProduction;
 
 app.use(cors({ origin: corsOrigin, credentials: true }));
-app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(authMiddleware);
 
 app.use("/api", router);
 

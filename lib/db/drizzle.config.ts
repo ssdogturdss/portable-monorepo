@@ -1,8 +1,9 @@
 import { defineConfig } from "drizzle-kit";
+import path from "path";
 
 export default defineConfig({
-  schema: "./src/schema/index.ts",
-  out: "./drizzle",
+  schema: path.join(__dirname, "./src/schema/index.ts"),
+  out: path.join(__dirname, "./drizzle"),
   dialect: "postgresql",
   // DATABASE_URL is required for push/migrate but not for generate/check.
   // drizzle-kit will surface a clear error if it is missing at runtime.
