@@ -144,15 +144,54 @@ The project uses **PostgreSQL** with **Drizzle ORM** for schema management.
 - `sessions` — AI chat sessions (title, model, timestamps)
 - `messages` — individual chat messages (role, content, session reference)
 
-**Push schema changes** to the database:
+### Development workflow
+
+`drizzle-kit push` syncs the schema directly to the database without writing migration files — convenient for local iteration:
+
 ```bash
 pnpm --filter @workspace/db run push
 ```
 
-**Generate a migration file** (optional — push is fine for most workflows):
-```bash
-pnpm --filter @workspace/db run generate
-```
+> ⚠️ **Never run `push` or `push-force` against a production database.** These commands can silently drop columns or tables that no longer appear in the schema. Use the migration workflow below for any environment that holds real data.
+
+### Safe migration path (staging & production)
+
+All schema changes destined for production **must** go through tracked migration files:
+
+1. **Edit the schema** in `lib/db/src/schema/`.
+
+2. **Generate a migration file:**
+   ```bash
+   pnpm --filter @workspace/db run generate
+   ```
+   Drizzle writes a new `.sql` file under `lib/db/drizzle/`.
+
+3. **Review the generated SQL before committing.**
+   Open the file and read every statement. Pay particular attention to:
+   - `DROP TABLE` — permanently removes a table and all its rows.
+   - `ALTER TABLE … DROP COLUMN` — permanently removes a column and all its values.
+
+   If you see either statement and it is unintentional, **stop** — adjust the schema and regenerate.
+
+4. **Commit the migration file** alongside the schema change.
+   CI (`schema-check` job) will reject any migration that contains `DROP TABLE` or `DROP COLUMN` unless `ALLOW_DESTRUCTIVE_MIGRATIONS=1` is set on the job.
+
+5. **Apply the migration in production:**
+   ```bash
+   DATABASE_URL=postgres://... pnpm --filter @workspace/db run migrate
+   ```
+   `drizzle-kit migrate` replays only the committed `.sql` files that have not yet been applied, in order. It never generates or drops anything on its own.
+
+6. **Verify** with a quick health check or integration test before routing live traffic.
+
+### Handling intentional destructive changes
+
+If you genuinely need to drop a column or table from a live database:
+
+1. **Deprecate first** — stop writing to the column/table in a prior release, then verify in production logs that nothing still reads it.
+2. **Back up** — snapshot the data (e.g. `CREATE TABLE … AS SELECT …`) before dropping.
+3. **Generate and review** the migration as usual.
+4. **Bypass the CI guard** by setting `ALLOW_DESTRUCTIVE_MIGRATIONS=1` on the `schema-check` job for that PR, with a comment in the migration SQL explaining why the drop is safe.
 
 **Connect with psql** (when using Docker Compose):
 ```bash

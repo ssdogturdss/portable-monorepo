@@ -85,7 +85,44 @@ jobs:
           git add --intent-to-add lib/db/drizzle/
           git diff --exit-code lib/db/drizzle/
 
-      # 3. Build the API server, start it against the CI database, and
+      # 3. Fail loudly if any committed migration contains a destructive
+      #    statement (DROP TABLE or DROP COLUMN). This is the primary guard
+      #    against accidental data loss when schema columns are removed.
+      #    Developers who intentionally need a destructive migration must
+      #    explicitly acknowledge the risk (see README § Safe migration path).
+      - name: Block destructive migrations (DROP TABLE / DROP COLUMN)
+        run: |
+          DESTRUCTIVE=$(grep -rliE '^\s*(DROP\s+TABLE|ALTER\s+TABLE\s+\S+\s+DROP\s+COLUMN)' lib/db/drizzle/*.sql 2>/dev/null || true)
+          if [ -n "$DESTRUCTIVE" ]; then
+            echo ""
+            echo "##############################################################"
+            echo "  DESTRUCTIVE MIGRATION DETECTED — CI BLOCKED"
+            echo "##############################################################"
+            echo ""
+            echo "The following migration file(s) contain DROP TABLE or DROP COLUMN:"
+            echo "$DESTRUCTIVE"
+            echo ""
+            echo "Dropping columns or tables from a live database can cause"
+            echo "irreversible data loss. Before merging:"
+            echo "  1. Confirm that every affected column/table has already been"
+            echo "     deprecated and emptied (or backed up) in production."
+            echo "  2. If the change is intentional, add a comment to the SQL"
+            echo "     file explaining why it is safe, then set the environment"
+            echo "     variable ALLOW_DESTRUCTIVE_MIGRATIONS=1 in the CI job to"
+            echo "     bypass this check."
+            echo ""
+            echo "See README § 'Safe migration path' for the full process."
+            echo ""
+            if [ "${ALLOW_DESTRUCTIVE_MIGRATIONS:-0}" != "1" ]; then
+              exit 1
+            else
+              echo "ALLOW_DESTRUCTIVE_MIGRATIONS=1 — check bypassed (proceed with caution)."
+            fi
+          else
+            echo "No destructive statements found in committed migrations. ✓"
+          fi
+
+      # 4. Build the API server, start it against the CI database, and
       #    smoke-test the health endpoint. This catches schema changes that
       #    pass the migration check but crash the server at runtime (e.g. a
       #    column rename that is still referenced by a query).
