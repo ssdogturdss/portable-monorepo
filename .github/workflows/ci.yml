@@ -84,3 +84,45 @@ jobs:
           pnpm --filter @workspace/db run generate
           git add --intent-to-add lib/db/drizzle/
           git diff --exit-code lib/db/drizzle/
+
+      # 3. Build the API server, start it against the CI database, and
+      #    smoke-test the health endpoint. This catches schema changes that
+      #    pass the migration check but crash the server at runtime (e.g. a
+      #    column rename that is still referenced by a query).
+      - name: Build API server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Smoke-test API server against migrated database
+        run: |
+          PORT=3000 \
+          DATABASE_URL=postgres://app:ci_password@localhost:5432/app \
+          SESSION_SECRET=ci-smoke-test-secret-not-used-in-production-000 \
+          pnpm --filter @workspace/api-server run start &
+          API_PID=$!
+
+          # Wait up to 30 s for the server to accept connections.
+          echo "Waiting for API server to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/api/healthz > /dev/null 2>&1; then
+              echo "Server is up."
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "API server did not start within 30 seconds."
+              kill "$API_PID" 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Run the health check and capture the HTTP status code.
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/healthz)
+          echo "Health endpoint returned HTTP $HTTP_STATUS"
+
+          kill "$API_PID" 2>/dev/null || true
+
+          if [ "$HTTP_STATUS" -ge 500 ] || [ "$HTTP_STATUS" -eq 0 ]; then
+            echo "Smoke test FAILED: health endpoint returned $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Smoke test PASSED."
